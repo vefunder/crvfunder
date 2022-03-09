@@ -75,7 +75,7 @@ def user_checkpoint(_user: address) -> bool:
     inflation_params: uint256 = self.inflation_params
     rate: uint256 = shift(inflation_params, -40)
     future_epoch_time: uint256 = bitwise_and(inflation_params, 2 ** 40 - 1)
-    
+
     # initialize variables for tracking timedelta between weeks
     prev_week_time: uint256 = last_checkpoint
     # either the start of the next week or the current timestamp
@@ -102,16 +102,16 @@ def user_checkpoint(_user: address) -> bool:
             self.inflation_params = shift(rate, 40) + future_epoch_time
         else:
             new_emissions += rate * w * dt / 10 ** 18
-        
+
         if week_time == block.timestamp:
             break
         # update timestamps for tracking timedelta
         prev_week_time = week_time
         week_time = min(week_time + WEEK, block.timestamp)
-    
+
     self.integrate_fraction[VYPER_WALLET] += new_emissions
     self.last_checkpoint = block.timestamp
-    
+
     log Checkpoint(block.timestamp, new_emissions)
     return True
 
