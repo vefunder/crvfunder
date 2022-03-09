@@ -52,8 +52,8 @@ max_integrate_fraction: public(uint256)
 
 @external
 def __init__(
-    fund_receipient: address, 
-    funding_end_timestamp: uint256, 
+    fund_receipient: address,
+    funding_end_timestamp: uint256,
     max_integrate_fraction: uint256
 ):
     self.fund_receipient = fund_receipient
@@ -79,7 +79,7 @@ def user_checkpoint(_user: address) -> bool:
     # if time has not advanced since the last checkpoint
     if block.timestamp == last_checkpoint:
         return True
-    
+
     # if funding duration has expired, direct to treasury:
     fund_receipient: address = self.fund_receipient
     if block.timestamp >= self.funding_end_timestamp:
