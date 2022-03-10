@@ -41,7 +41,7 @@ def __init__():
 
 
 @external
-def deploy(_receiver: address, _deadline: uint256, _max_emissions: uint256):
+def deploy(_receiver: address, _deadline: uint256, _max_emissions: uint256) -> address:
     funder: address = create_forwarder_to(self.implementation)
     Funder(funder).initialize(_receiver, _deadline, _max_emissions)
 
@@ -51,6 +51,7 @@ def deploy(_receiver: address, _deadline: uint256, _max_emissions: uint256):
     self.get_funders_count = funders_count + 1
 
     log NewFunder(_receiver, _deadline, _max_emissions, funder)
+    return funder
 
 
 @external
