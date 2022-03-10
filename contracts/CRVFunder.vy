@@ -129,7 +129,7 @@ def user_checkpoint(_user: address) -> bool:
     # cap accumulated emissions only for fund receipient
     # todo: check with skelletor if this is the right approach
     if fund_receipient == self.fund_receipient:
-        new_emissions = max(self.max_integrate_fraction, new_emissions)
+        new_emissions = min(self.max_integrate_fraction, new_emissions)
 
     self.integrate_fraction[fund_receipient] += new_emissions
     self.last_checkpoint = block.timestamp
