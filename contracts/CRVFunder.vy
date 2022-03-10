@@ -42,29 +42,15 @@ inflation_params: uint256
 integrate_fraction: public(HashMap[address, uint256])
 last_checkpoint: public(uint256)
 
-owner: public(address)
-future_owner: public(address)
 fund_receipient: public(address)
-
 funding_end_timestamp: public(uint256)
 max_integrate_fraction: public(uint256)
 
 
 @external
-def __init__(
-    fund_receipient: address,
-    funding_end_timestamp: uint256,
-    max_integrate_fraction: uint256
-):
-    self.fund_receipient = fund_receipient
-    self.funding_end_timestamp = funding_end_timestamp
-    self.max_integrate_fraction = max_integrate_fraction
-
-    self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
-    self.last_checkpoint = block.timestamp
-
-    self.owner = msg.sender
-    log TransferOwnership(ZERO_ADDRESS, msg.sender)
+def __init__():
+    # prevent initialization of the implementation contract
+    self.fund_recipient = 0x000000000000000000000000000000000000dEaD
 
 
 @external
@@ -152,29 +138,6 @@ def set_killed(_is_killed: bool):
         self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
 
 
-@external
-def commit_transfer_ownership(_future_owner: address):
-    """
-    @notice Commit the transfer of ownership to `_future_owner`
-    @param _future_owner The account to commit as the future owner
-    """
-    assert msg.sender == self.owner  # dev: only owner
-
-    self.future_owner = _future_owner
-
-
-@external
-def accept_transfer_ownership():
-    """
-    @notice Accept the transfer of ownership
-    @dev Only the committed future owner can call this function
-    """
-    assert msg.sender == self.future_owner  # dev: only future owner
-
-    log TransferOwnership(self.owner, msg.sender)
-    self.owner = msg.sender
-
-
 @view
 @external
 def inflation_rate() -> uint256:
@@ -191,3 +154,30 @@ def future_epoch_time() -> uint256:
     @notice Get the locally stored timestamp of the inflation rate epoch end
     """
     return bitwise_and(self.inflation_params, 2 ** 40 - 1)
+
+
+@external
+def initialize(
+    _fund_receipient: address,
+    _funding_end_timestamp: uint256,
+    _max_integrate_fraction: uint256
+):
+    """
+    @notice Proxy initializer method
+    @dev Placed last in the source file to save some gas, this fn is called only once.
+        Additional checks should be made by the DAO before voting in this gauge, specifically
+        to make sure that `_fund_recipient` is capable of collecting emissions.
+    @param _fund_recipient The address which will receive CRV emissions
+    @param _funding_end_timestamp The timestamp at which emissions will redirect to
+        the Curve Grant Council Multisig
+    @param _max_integrate_fraction The maximum amount of emissions which `_fund_recipient` will
+        receive
+    """
+    assert self.fund_receipient == ZERO_ADDRESS  # dev: already initialized
+
+    self.fund_receipient = _fund_receipient
+    self.funding_end_timestamp = _funding_end_timestamp
+    self.max_integrate_fraction = _max_integrate_fraction
+
+    self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
+    self.last_checkpoint = block.timestamp
