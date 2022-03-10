@@ -25,7 +25,7 @@ event TransferOwnership:
 
 CRV: constant(address) = 0xD533a949740bb3306d119CC777fa900bA034cd52
 GAUGE_CONTROLLER: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB
-TREASURY_ADDRESS: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB  # todo: add treasury adddress here
+GRANT_COUNCIL_MULTISIG: constant(address) = 0xc420C9d507D0E038BD76383AaADCAd576ed0073c
 
 WEEK: constant(uint256) = 604800
 YEAR: constant(uint256) = 86400 * 365
@@ -173,3 +173,21 @@ def accept_transfer_ownership():
 
     log TransferOwnership(self.owner, msg.sender)
     self.owner = msg.sender
+
+
+@view
+@external
+def inflation_rate() -> uint256:
+    """
+    @notice Get the locally stored inflation rate
+    """
+    return shift(self.inflation_params, -40)
+
+
+@view
+@external
+def future_epoch_time() -> uint256:
+    """
+    @notice Get the locally stored timestamp of the inflation rate epoch end
+    """
+    return bitwise_and(self.inflation_params, 2 ** 40 - 1)
