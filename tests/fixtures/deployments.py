@@ -1,4 +1,5 @@
 import pytest
+from brownie import compile_source
 
 
 @pytest.fixture(scope="module")
@@ -29,3 +30,34 @@ def minter(alice, crv20, gauge_controller, curve_dao):
     minter = curve_dao.Minter.deploy(crv20, gauge_controller, {"from": alice})
     crv20.set_minter(minter, {"from": alice})
     return minter
+
+
+@pytest.fixture(scope="module")
+def factory(alice, Factory):
+    return Factory.deploy({"from": alice})
+
+
+@pytest.fixture(scope="module")
+def CRVFunderLocal(alice, CRVFunder, crv20, gauge_controller):
+    src = CRVFunder._build["source"]
+    addrs = [
+        "0xD533a949740bb3306d119CC777fa900bA034cd52",
+        "0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB",
+    ]
+    for old, new in zip(addrs, [crv20.address, gauge_controller.address]):
+        src = src.replace(old, new, 1)
+
+    return compile_source(src, vyper_version="0.3.1").Vyper
+
+
+@pytest.fixture(scope="module")
+def implementation(alice, CRVFunderLocal):
+    return CRVFunderLocal.deploy({"from": alice})
+
+
+@pytest.fixture(scope="module")
+def funder(alice, factory, implementation, CRVFunderLocal):
+    factory.set_implementation(implementation, {"from": alice})
+    return CRVFunderLocal.at(
+        factory.deploy(alice, 2**40 - 1, 2**128 - 1, {"from": alice}).return_value
+    )
