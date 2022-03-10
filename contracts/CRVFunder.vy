@@ -71,46 +71,90 @@ def user_checkpoint(_user: address) -> bool:
     if block.timestamp == prev_week_time:
         return True
 
-    # either the start of the next week or the current timestamp
-    week_time: uint256 = min((prev_week_time + WEEK) / WEEK * WEEK, block.timestamp)
-
     # load and unpack inflation params
     inflation_params: uint256 = self.inflation_params
     rate: uint256 = shift(inflation_params, -40)
     future_epoch_time: uint256 = bitwise_and(inflation_params, 2 ** 40 - 1)
 
-    # track total new emissions while we loop
+    # load the receiver
+    receiver: address = self.receiver
+    # load and unpack receiver data
+    receiver_data: uint256 = self.receiver_data
+    deadline: uint256 = bitwise_and(receiver_data, 2 ** 40 - 1)
+    max_emissions: uint256 = shift(receiver_data, -40)
+
+    # initialize emission tracking variables
     new_emissions: uint256 = 0
+    multisig_emissions: uint256 = 0
+    receiver_emissions: uint256 = self.integrate_fraction[receiver]
 
     # checkpoint the gauge filling in any missing gauge data across weeks
     GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
 
-    # iterate over at maximum 512 weeks
+    # either the start of the next week or the current timestamp
+    week_time: uint256 = min((prev_week_time + WEEK) / WEEK * WEEK, block.timestamp)
+
+    # if the deadline is between our previous checkpoint and the end of the week
+    # set the week_time var to our deadline, so we can calculate up to it only
+    if prev_week_time < deadline and deadline < week_time:
+        week_time = deadline
+
+    # iterate 512 times at maximum
     for i in range(512):
         dt: uint256 = week_time - prev_week_time
         w: uint256 = GaugeController(GAUGE_CONTROLLER).gauge_relative_weight(self, prev_week_time / WEEK * WEEK)
+        emissions: uint256 = 0
 
+        # if we cross over an inflation epoch, calculate the emissions using old and new rate
         if prev_week_time <= future_epoch_time and future_epoch_time < week_time:
             # calculate up to the epoch using the old rate
-            new_emissions += rate * w * (future_epoch_time - prev_week_time) / 10 ** 18
+            emissions = rate * w * (future_epoch_time - prev_week_time) / 10 ** 18
             # update the rate in memory
             rate = rate * RATE_DENOMINATOR / RATE_REDUCTION_COEFFICIENT
-            # calculate past the epoch to the start of the next week
-            new_emissions += rate * w * (week_time - future_epoch_time) / 10 ** 18
+            # calculate using the new rate for the rest of the time period
+            emissions += rate * w * (week_time - future_epoch_time) / 10 ** 18
             # update the new future epoch time
             future_epoch_time += RATE_REDUCTION_TIME
             # update storage
             self.inflation_params = shift(rate, 40) + future_epoch_time
         else:
-            new_emissions += rate * w * dt / 10 ** 18
+            emissions = rate * w * dt / 10 ** 18
+
+        # TODO: make this part cleaner
+        # if the time period we are calculating for ends before or at the deadline
+        # deadline should never be between prev_week_time and week_time
+        if week_time <= deadline:
+            # if the receiver emissions + emissions from this period is greater than max_emissions
+            if receiver_emissions + emissions > max_emissions:
+                # how much does the receiver get from this period
+                amount: uint256 = max_emissions - receiver_emissions
+                receiver_emissions += amount
+                # the emissions from this period - amount given to receiver goes to multisig
+                multisig_emissions += emissions - amount
+            else:
+                receiver_emissions += emissions
+        else:
+            multisig_emissions += emissions
 
         if week_time == block.timestamp:
             break
+
         # update timestamps for tracking timedelta
         prev_week_time = week_time
-        week_time = min(week_time + WEEK, block.timestamp)
+        week_time = min((week_time + WEEK) / WEEK * WEEK, block.timestamp)
 
-    self.integrate_fraction[GRANT_COUNCIL_MULTISIG] += new_emissions
+        if prev_week_time < deadline and deadline < week_time:
+            week_time = deadline
+
+
+    # multisig has received emissions
+    if multisig_emissions != 0:
+        self.integrate_fraction[GRANT_COUNCIL_MULTISIG] += multisig_emissions
+
+    # this will only be the case if receiver got emissions
+    if multisig_emissions != new_emissions:
+        self.integrate_fraction[receiver] = receiver_emissions
+
     self.last_checkpoint = block.timestamp
 
     log Checkpoint(block.timestamp, new_emissions)
