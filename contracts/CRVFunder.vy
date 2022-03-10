@@ -120,9 +120,7 @@ def user_checkpoint(_user: address) -> bool:
         else:
             emissions = rate * w * dt / 10 ** 18
 
-        # TODO: make this part cleaner
         # if the time period we are calculating for ends before or at the deadline
-        # deadline should never be between prev_week_time and week_time
         if week_time <= deadline:
             # if the receiver emissions + emissions from this period is greater than max_emissions
             if receiver_emissions + emissions > max_emissions:
@@ -210,6 +208,17 @@ def future_epoch_time() -> uint256:
     @notice Get the locally stored timestamp of the inflation rate epoch end
     """
     return bitwise_and(self.inflation_params, 2 ** 40 - 1)
+
+
+@pure
+@external
+def fallback_receiver() -> address:
+    """
+    @notice Get the address of the fallback receiver. This address will
+        receiver emissions when either max_emissions has been reached for
+        the primary receiver or the deadline has passed.
+    """
+    return GRANT_COUNCIL_MULTISIG
 
 
 @external
