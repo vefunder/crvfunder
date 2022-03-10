@@ -120,6 +120,7 @@ def user_checkpoint(_user: address) -> bool:
         else:
             emissions = rate * w * dt / 10 ** 18
 
+        new_emissions += emissions
         # if the time period we are calculating for ends before or at the deadline
         if week_time <= deadline:
             # if the receiver emissions + emissions from this period is greater than max_emissions
