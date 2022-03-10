@@ -87,7 +87,7 @@ def test_reach_deadline(alice, gauge_controller, factory, CRVFunderLocal, crv20)
         prev_week_time = week_time
 
     assert alice_emissions == funder.integrate_fraction(alice)
-    assert fallback_emissions == funder.integrate_fraction(funder.fallback_receiver())
+    assert fallback_emissions == funder.integrate_fraction(funder.cached_fallback_receiver())
 
 
 @pytest.mark.skip_coverage
@@ -135,4 +135,4 @@ def test_reach_emissions_max(alice, gauge_controller, factory, CRVFunderLocal, c
         prev_week_time = week_time
 
     assert alice_emissions == funder.integrate_fraction(alice) == max_emissions
-    assert fallback_emissions == funder.integrate_fraction(funder.fallback_receiver())
+    assert fallback_emissions == funder.integrate_fraction(funder.cached_fallback_receiver())

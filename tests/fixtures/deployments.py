@@ -33,8 +33,8 @@ def minter(alice, crv20, gauge_controller, curve_dao):
 
 
 @pytest.fixture(scope="module")
-def factory(alice, Factory):
-    return Factory.deploy({"from": alice})
+def factory(alice, bob, Factory):
+    return Factory.deploy(bob, {"from": alice})
 
 
 @pytest.fixture(scope="module")
