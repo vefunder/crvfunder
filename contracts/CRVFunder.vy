@@ -1,7 +1,7 @@
 # @version 0.3.1
 """
-@title Vyper Fund
-@notice Custom gauge directing emissions to wallet.vyper.eth
+@title veFunder
+@notice Custom gauge directing emissions to specified wallet
 """
 
 
@@ -25,15 +25,15 @@ event TransferOwnership:
 
 CRV: constant(address) = 0xD533a949740bb3306d119CC777fa900bA034cd52
 GAUGE_CONTROLLER: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB
-VYPER_WALLET: constant(address) = 0x70CCBE10F980d80b7eBaab7D2E3A73e87D67B775
+TREASURY_ADDRESS: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB  # todo: add treasury adddress here
 
 WEEK: constant(uint256) = 604800
 YEAR: constant(uint256) = 86400 * 365
+
 # taken from CRV20 to allow calculating locally
 RATE_DENOMINATOR: constant(uint256) = 10 ** 18
 RATE_REDUCTION_COEFFICIENT: constant(uint256) = 1189207115002721024  # 2 ** (1/4) * 1e18
 RATE_REDUCTION_TIME: constant(uint256) = YEAR
-
 
 # [uint216 inflation_rate][uint40 future_epoch_time]
 inflation_params: uint256
@@ -44,10 +44,22 @@ last_checkpoint: public(uint256)
 
 owner: public(address)
 future_owner: public(address)
+fund_receipient: public(address)
+
+funding_end_timestamp: public(uint256)
+max_integrate_fraction: public(uint256)
 
 
 @external
-def __init__():
+def __init__(
+    fund_receipient: address,
+    funding_end_timestamp: uint256,
+    max_integrate_fraction: uint256
+):
+    self.fund_receipient = fund_receipient
+    self.funding_end_timestamp = funding_end_timestamp
+    self.max_integrate_fraction = max_integrate_fraction
+
     self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
     self.last_checkpoint = block.timestamp
 
@@ -67,6 +79,11 @@ def user_checkpoint(_user: address) -> bool:
     # if time has not advanced since the last checkpoint
     if block.timestamp == last_checkpoint:
         return True
+
+    # if funding duration has expired, direct to treasury:
+    fund_receipient: address = self.fund_receipient
+    if block.timestamp >= self.funding_end_timestamp:
+        fund_receipient = TREASURY_ADDRESS
 
     # checkpoint the gauge filling in gauge data across weeks
     GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
@@ -109,7 +126,12 @@ def user_checkpoint(_user: address) -> bool:
         prev_week_time = week_time
         week_time = min(week_time + WEEK, block.timestamp)
 
-    self.integrate_fraction[VYPER_WALLET] += new_emissions
+    # cap accumulated emissions only for fund receipient
+    # todo: check with skelletor if this is the right approach
+    if fund_receipient == self.fund_receipient:
+        new_emissions = min(self.max_integrate_fraction, new_emissions)
+
+    self.integrate_fraction[fund_receipient] += new_emissions
     self.last_checkpoint = block.timestamp
 
     log Checkpoint(block.timestamp, new_emissions)
