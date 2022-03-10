@@ -9,6 +9,9 @@ interface CRV20:
     def rate() -> uint256: view
     def future_epoch_time_write() -> uint256: nonpayable
 
+interface Factory:
+    def owner() -> address: view
+
 interface GaugeController:
     def checkpoint_gauge(_gauge: address): nonpayable
     def gauge_relative_weight(_gauge: address, _time: uint256) -> uint256: view
@@ -42,15 +45,17 @@ inflation_params: uint256
 integrate_fraction: public(HashMap[address, uint256])
 last_checkpoint: public(uint256)
 
-fund_receipient: public(address)
+fund_recipient: public(address)
 funding_end_timestamp: public(uint256)
 max_integrate_fraction: public(uint256)
+
+factory: public(address)
 
 
 @external
 def __init__():
     # prevent initialization of the implementation contract
-    self.fund_recipient = 0x000000000000000000000000000000000000dEaD
+    self.factory = 0x000000000000000000000000000000000000dEaD
 
 
 @external
@@ -67,9 +72,9 @@ def user_checkpoint(_user: address) -> bool:
         return True
 
     # if funding duration has expired, direct to treasury:
-    fund_receipient: address = self.fund_receipient
+    fund_recipient: address = self.fund_recipient
     if block.timestamp >= self.funding_end_timestamp:
-        fund_receipient = TREASURY_ADDRESS
+        fund_recipient = GRANT_COUNCIL_MULTISIG
 
     # checkpoint the gauge filling in gauge data across weeks
     GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
@@ -114,10 +119,10 @@ def user_checkpoint(_user: address) -> bool:
 
     # cap accumulated emissions only for fund receipient
     # todo: check with skelletor if this is the right approach
-    if fund_receipient == self.fund_receipient:
-        new_emissions = min(self.max_integrate_fraction, new_emissions)
+    if fund_recipient == self.fund_recipient:
+        new_emissions = max(self.max_integrate_fraction, new_emissions)
 
-    self.integrate_fraction[fund_receipient] += new_emissions
+    self.integrate_fraction[fund_recipient] += new_emissions
     self.last_checkpoint = block.timestamp
 
     log Checkpoint(block.timestamp, new_emissions)
@@ -130,7 +135,7 @@ def set_killed(_is_killed: bool):
     @notice Set the gauge status
     @dev Inflation params are modified accordingly to disable/enable emissions
     """
-    assert msg.sender == self.owner
+    assert msg.sender == Factory(self.factory).owner()
 
     if _is_killed:
         self.inflation_params = 0
@@ -158,7 +163,7 @@ def future_epoch_time() -> uint256:
 
 @external
 def initialize(
-    _fund_receipient: address,
+    _fund_recipient: address,
     _funding_end_timestamp: uint256,
     _max_integrate_fraction: uint256
 ):
@@ -173,9 +178,11 @@ def initialize(
     @param _max_integrate_fraction The maximum amount of emissions which `_fund_recipient` will
         receive
     """
-    assert self.fund_receipient == ZERO_ADDRESS  # dev: already initialized
+    assert self.factory == ZERO_ADDRESS  # dev: already initialized
 
-    self.fund_receipient = _fund_receipient
+    self.factory = msg.sender
+
+    self.fund_recipient = _fund_recipient
     self.funding_end_timestamp = _funding_end_timestamp
     self.max_integrate_fraction = _max_integrate_fraction
 
