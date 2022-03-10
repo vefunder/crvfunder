@@ -13,6 +13,10 @@ event UpdateImplementation:
     _old_implementation: address
     _new_implementation: address
 
+event UpdateFallbackReceiver:
+    _old_fallback: address
+    _new_fallback: address
+
 event TransferOwnership:
     _old_owner: address
     _new_owner: address
