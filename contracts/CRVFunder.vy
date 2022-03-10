@@ -64,33 +64,31 @@ def user_checkpoint(_user: address) -> bool:
     @notice Checkpoint the gauge updating total emissions
     @param _user The user to checkpoint and update accumulated emissions for
     """
-    # timestamp of the last checkpoint
-    last_checkpoint: uint256 = self.last_checkpoint
+    # timestamp of the last checkpoint and start point for calculating new emissions
+    prev_week_time: uint256 = self.last_checkpoint
 
     # if time has not advanced since the last checkpoint
-    if block.timestamp == last_checkpoint:
+    if block.timestamp == prev_week_time:
         return True
+
+    # either the start of the next week or the current timestamp
+    week_time: uint256 = min((prev_week_time + WEEK) / WEEK * WEEK, block.timestamp)
 
     # if funding duration has expired, direct to treasury:
     fund_recipient: address = self.fund_recipient
     if block.timestamp >= self.funding_end_timestamp:
         fund_recipient = GRANT_COUNCIL_MULTISIG
 
-    # checkpoint the gauge filling in gauge data across weeks
-    GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
-
     # load and unpack inflation params
     inflation_params: uint256 = self.inflation_params
     rate: uint256 = shift(inflation_params, -40)
     future_epoch_time: uint256 = bitwise_and(inflation_params, 2 ** 40 - 1)
 
-    # initialize variables for tracking timedelta between weeks
-    prev_week_time: uint256 = last_checkpoint
-    # either the start of the next week or the current timestamp
-    week_time: uint256 = min((last_checkpoint + WEEK) / WEEK * WEEK, block.timestamp)
-
     # track total new emissions while we loop
     new_emissions: uint256 = 0
+
+    # checkpoint the gauge filling in any missing gauge data across weeks
+    GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
 
     # iterate over at maximum 512 weeks
     for i in range(512):
