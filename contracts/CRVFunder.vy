@@ -125,11 +125,10 @@ def user_checkpoint(_user: address) -> bool:
         if week_time <= deadline:
             # if the receiver emissions + emissions from this period is greater than max_emissions
             if receiver_emissions + emissions > max_emissions:
-                # how much does the receiver get from this period
-                amount: uint256 = max_emissions - receiver_emissions
-                receiver_emissions += amount
                 # the emissions from this period - amount given to receiver goes to multisig
-                multisig_emissions += emissions - amount
+                multisig_emissions += emissions - (max_emissions - receiver_emissions)
+                # how much does the receiver get from this period
+                receiver_emissions = max_emissions
             else:
                 receiver_emissions += emissions
         else:
