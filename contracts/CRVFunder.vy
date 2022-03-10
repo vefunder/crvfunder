@@ -11,6 +11,7 @@ interface CRV20:
 
 interface Factory:
     def owner() -> address: view
+    def fallback_receiver() -> address: view
 
 interface GaugeController:
     def checkpoint_gauge(_gauge: address): nonpayable
@@ -28,7 +29,6 @@ event TransferOwnership:
 
 CRV: constant(address) = 0xD533a949740bb3306d119CC777fa900bA034cd52
 GAUGE_CONTROLLER: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB
-GRANT_COUNCIL_MULTISIG: constant(address) = 0xc420C9d507D0E038BD76383AaADCAd576ed0073c
 
 WEEK: constant(uint256) = 604800
 YEAR: constant(uint256) = 86400 * 365
@@ -50,6 +50,7 @@ receiver: public(address)
 receiver_data: uint256
 
 factory: public(address)
+cached_fallback_receiver: public(address)
 
 
 @external
@@ -147,7 +148,7 @@ def user_checkpoint(_user: address) -> bool:
 
     # multisig has received emissions
     if multisig_emissions != 0:
-        self.integrate_fraction[GRANT_COUNCIL_MULTISIG] += multisig_emissions
+        self.integrate_fraction[self.cached_fallback_receiver] += multisig_emissions
 
     # this will only be the case if receiver got emissions
     if multisig_emissions != new_emissions:
@@ -171,6 +172,14 @@ def set_killed(_is_killed: bool):
         self.inflation_params = 0
     else:
         self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
+
+
+@external
+def update_cached_fallback_receiver():
+    """
+    @notice Update the cached fallback receiver
+    """
+    self.cached_fallback_receiver = Factory(self.factory).fallback_receiver()
 
 
 @view
@@ -210,17 +219,6 @@ def future_epoch_time() -> uint256:
     return bitwise_and(self.inflation_params, 2 ** 40 - 1)
 
 
-@pure
-@external
-def fallback_receiver() -> address:
-    """
-    @notice Get the address of the fallback receiver. This address will
-        receiver emissions when either max_emissions has been reached for
-        the primary receiver or the deadline has passed.
-    """
-    return GRANT_COUNCIL_MULTISIG
-
-
 @external
 def initialize(
     _receiver: address,
@@ -247,6 +245,7 @@ def initialize(
 
     self.receiver = _receiver
     self.receiver_data = shift(_max_emissions, 40) + _deadline
+    self.cached_fallback_receiver = Factory(msg.sender).fallback_receiver()
 
     self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
     self.last_checkpoint = block.timestamp
