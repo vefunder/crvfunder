@@ -45,9 +45,9 @@ inflation_params: uint256
 integrate_fraction: public(HashMap[address, uint256])
 last_checkpoint: public(uint256)
 
-fund_recipient: public(address)
-funding_end_timestamp: public(uint256)
-max_integrate_fraction: public(uint256)
+receiver: public(address)
+# [uint216 max_emissions][uint40 deadline]
+receiver_data: uint256
 
 factory: public(address)
 
@@ -73,11 +73,6 @@ def user_checkpoint(_user: address) -> bool:
 
     # either the start of the next week or the current timestamp
     week_time: uint256 = min((prev_week_time + WEEK) / WEEK * WEEK, block.timestamp)
-
-    # if funding duration has expired, direct to treasury:
-    fund_recipient: address = self.fund_recipient
-    if block.timestamp >= self.funding_end_timestamp:
-        fund_recipient = GRANT_COUNCIL_MULTISIG
 
     # load and unpack inflation params
     inflation_params: uint256 = self.inflation_params
@@ -115,12 +110,7 @@ def user_checkpoint(_user: address) -> bool:
         prev_week_time = week_time
         week_time = min(week_time + WEEK, block.timestamp)
 
-    # cap accumulated emissions only for fund receipient
-    # todo: check with skelletor if this is the right approach
-    if fund_recipient == self.fund_recipient:
-        new_emissions = max(self.max_integrate_fraction, new_emissions)
-
-    self.integrate_fraction[fund_recipient] += new_emissions
+    self.integrate_fraction[GRANT_COUNCIL_MULTISIG] += new_emissions
     self.last_checkpoint = block.timestamp
 
     log Checkpoint(block.timestamp, new_emissions)
@@ -143,6 +133,25 @@ def set_killed(_is_killed: bool):
 
 @view
 @external
+def max_emissions() -> uint256:
+    """
+    @notice Get the maximum amount of emissions distributed to the receiver, afterwards
+        emissions are diverted to the Grant Council Multisig
+    """
+    return shift(self.receiver_data, -40)
+
+
+@view
+@external
+def deadline() -> uint256:
+    """
+    @notice Get the timestamp at which emissions are diverted to the Grant Council Multisig
+    """
+    return bitwise_and(self.receiver_data, 2 ** 40 - 1)
+
+
+@view
+@external
 def inflation_rate() -> uint256:
     """
     @notice Get the locally stored inflation rate
@@ -161,28 +170,30 @@ def future_epoch_time() -> uint256:
 
 @external
 def initialize(
-    _fund_recipient: address,
-    _funding_end_timestamp: uint256,
-    _max_integrate_fraction: uint256
+    _receiver: address,
+    _deadline: uint256,
+    _max_emissions: uint256
 ):
     """
     @notice Proxy initializer method
     @dev Placed last in the source file to save some gas, this fn is called only once.
         Additional checks should be made by the DAO before voting in this gauge, specifically
         to make sure that `_fund_recipient` is capable of collecting emissions.
-    @param _fund_recipient The address which will receive CRV emissions
-    @param _funding_end_timestamp The timestamp at which emissions will redirect to
+    @param _receiver The address which will receive CRV emissions
+    @param _deadline The timestamp at which emissions will redirect to
         the Curve Grant Council Multisig
-    @param _max_integrate_fraction The maximum amount of emissions which `_fund_recipient` will
+    @param _max_emissions The maximum amount of emissions which `_receiver` will
         receive
     """
     assert self.factory == ZERO_ADDRESS  # dev: already initialized
 
+    assert _deadline < 2 ** 40  # dev: invalid deadline
+    assert _max_emissions < 2 ** 216  # dev: invalid maximum emissions
+
     self.factory = msg.sender
 
-    self.fund_recipient = _fund_recipient
-    self.funding_end_timestamp = _funding_end_timestamp
-    self.max_integrate_fraction = _max_integrate_fraction
+    self.receiver = _receiver
+    self.receiver_data = shift(_max_emissions, 40) + _deadline
 
     self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
     self.last_checkpoint = block.timestamp
