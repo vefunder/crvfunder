@@ -25,6 +25,7 @@ event NewFunder:
 
 
 implementation: public(address)
+fallback_receiver: public(address)
 
 owner: public(address)
 future_owner: public(address)
@@ -34,10 +35,12 @@ funders: public(address[1000000])
 
 
 @external
-def __init__():
+def __init__(_fallback_receiver: address):
     self.owner = msg.sender
+    self.fallback_receiver = _fallback_receiver
 
     log TransferOwnership(ZERO_ADDRESS, msg.sender)
+    log UpdateFallbackReceiver(ZERO_ADDRESS, _fallback_receiver)
 
 
 @external
@@ -60,6 +63,14 @@ def set_implementation(_implementation: address):
 
     log UpdateImplementation(self.implementation, _implementation)
     self.implementation = _implementation
+
+
+@external
+def set_fallback_receiver(_fallback_receiver: address):
+    assert msg.sender == self.owner
+
+    log UpdateFallbackReceiver(self.fallback_receiver, _fallback_receiver)
+    self.fallback_receiver = _fallback_receiver
 
 
 @external
