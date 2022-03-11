@@ -92,16 +92,16 @@ def user_checkpoint(_user: address) -> bool:
     # checkpoint the gauge filling in any missing gauge data across weeks
     GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
 
-    # either the start of the next week or the current timestamp
-    week_time: uint256 = min((prev_week_time + WEEK) / WEEK * WEEK, block.timestamp)
-
-    # if the deadline is between our previous checkpoint and the end of the week
-    # set the week_time var to our deadline, so we can calculate up to it only
-    if prev_week_time < deadline and deadline < week_time:
-        week_time = deadline
-
     # iterate 512 times at maximum
     for i in range(512):
+        # either the start of the next week or the current timestamp
+        week_time: uint256 = min((prev_week_time + WEEK) / WEEK * WEEK, block.timestamp)
+
+        # if the deadline is between our previous checkpoint and the end of the week
+        # set the week_time var to our deadline, so we can calculate up to it only
+        if prev_week_time < deadline and deadline < week_time:
+            week_time = deadline
+
         dt: uint256 = week_time - prev_week_time
         w: uint256 = GaugeController(GAUGE_CONTROLLER).gauge_relative_weight(self, prev_week_time / WEEK * WEEK)
         emissions: uint256 = 0
@@ -140,11 +140,6 @@ def user_checkpoint(_user: address) -> bool:
 
         # update timestamps for tracking timedelta
         prev_week_time = week_time
-        week_time = min((week_time + WEEK) / WEEK * WEEK, block.timestamp)
-
-        if prev_week_time < deadline and deadline < week_time:
-            week_time = deadline
-
 
     # multisig has received emissions
     if multisig_emissions != 0:
