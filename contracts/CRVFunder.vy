@@ -46,8 +46,7 @@ integrate_fraction: public(HashMap[address, uint256])
 last_checkpoint: public(uint256)
 
 receiver: public(address)
-# [uint216 max_emissions][uint40 deadline]
-receiver_data: uint256
+max_emissions: public(uint256)
 
 factory: public(address)
 cached_fallback_receiver: public(address)
@@ -79,10 +78,7 @@ def user_checkpoint(_user: address) -> bool:
 
     # load the receiver
     receiver: address = self.receiver
-    # load and unpack receiver data
-    receiver_data: uint256 = self.receiver_data
-    deadline: uint256 = bitwise_and(receiver_data, 2 ** 40 - 1)
-    max_emissions: uint256 = shift(receiver_data, -40)
+    max_emissions: uint256 = self.max_emissions
 
     # initialize emission tracking variables
     multisig_emissions: uint256 = 0
@@ -92,53 +88,48 @@ def user_checkpoint(_user: address) -> bool:
     # checkpoint the gauge filling in any missing gauge data across weeks
     GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
 
+    # either the start of the next week or the current timestamp
+    week_time: uint256 = min((prev_week_time + WEEK) / WEEK * WEEK, block.timestamp)
+
     # iterate 512 times at maximum
     for i in range(512):
-        # either the start of the next week or the current timestamp
-        week_time: uint256 = min((prev_week_time + WEEK) / WEEK * WEEK, block.timestamp)
-
-        # if the deadline is between our previous checkpoint and the end of the week
-        # set the week_time var to our deadline, so we can calculate up to it only
-        if prev_week_time < deadline and deadline < week_time:
-            week_time = deadline
-
         dt: uint256 = week_time - prev_week_time
         w: uint256 = GaugeController(GAUGE_CONTROLLER).gauge_relative_weight(self, prev_week_time / WEEK * WEEK)
-        emissions: uint256 = 0
+
+        period_emissions: uint256 = 0
 
         # if we cross over an inflation epoch, calculate the emissions using old and new rate
         if prev_week_time <= future_epoch_time and future_epoch_time < week_time:
             # calculate up to the epoch using the old rate
-            emissions = rate * w * (future_epoch_time - prev_week_time) / 10 ** 18
+            period_emissions = rate * w * (future_epoch_time - prev_week_time) / 10 ** 18
             # update the rate in memory
             rate = rate * RATE_DENOMINATOR / RATE_REDUCTION_COEFFICIENT
             # calculate using the new rate for the rest of the time period
-            emissions += rate * w * (week_time - future_epoch_time) / 10 ** 18
+            period_emissions += rate * w * (week_time - future_epoch_time) / 10 ** 18
             # update the new future epoch time
             future_epoch_time += RATE_REDUCTION_TIME
             # update storage
             self.inflation_params = shift(rate, 40) + future_epoch_time
         else:
-            emissions = rate * w * dt / 10 ** 18
+            period_emissions = rate * w * dt / 10 ** 18
 
-        # if the time period we are calculating for ends before or at the deadline
-        if week_time <= deadline:
-            # if the receiver emissions + emissions from this period is greater than max_emissions
-            if receiver_emissions + emissions > max_emissions:
-                # the emissions from this period - amount given to receiver goes to multisig
-                multisig_emissions += emissions - (max_emissions - receiver_emissions)
-                # how much does the receiver get from this period
-                receiver_emissions = max_emissions
-            else:
-                receiver_emissions += emissions
+        # if adding period emissions is still below max emissions add to receiver
+        if receiver_emissions + period_emissions <= max_emissions:
+            receiver_emissions += period_emissions
+        # if we have stored less than max emissions then give remainder to multisig and set to max
+        elif receiver_emissions < max_emissions:
+            multisig_emissions += period_emissions - (max_emissions - receiver_emissions)
+            receiver_emissions = max_emissions
+        # else give emissions to the multisig
         else:
-            multisig_emissions += emissions
+            multisig_emissions += period_emissions
 
         if week_time == block.timestamp:
             break
 
         # update timestamps for tracking timedelta
         prev_week_time = week_time
+        week_time = min(week_time + WEEK, block.timestamp)
 
     # multisig has received emissions
     if multisig_emissions != 0:
@@ -178,25 +169,6 @@ def update_cached_fallback_receiver():
 
 @view
 @external
-def max_emissions() -> uint256:
-    """
-    @notice Get the maximum amount of emissions distributed to the receiver, afterwards
-        emissions are diverted to the Grant Council Multisig
-    """
-    return shift(self.receiver_data, -40)
-
-
-@view
-@external
-def deadline() -> uint256:
-    """
-    @notice Get the timestamp at which emissions are diverted to the Grant Council Multisig
-    """
-    return bitwise_and(self.receiver_data, 2 ** 40 - 1)
-
-
-@view
-@external
 def inflation_rate() -> uint256:
     """
     @notice Get the locally stored inflation rate
@@ -214,31 +186,22 @@ def future_epoch_time() -> uint256:
 
 
 @external
-def initialize(
-    _receiver: address,
-    _deadline: uint256,
-    _max_emissions: uint256
-):
+def initialize(_receiver: address, _max_emissions: uint256):
     """
     @notice Proxy initializer method
     @dev Placed last in the source file to save some gas, this fn is called only once.
         Additional checks should be made by the DAO before voting in this gauge, specifically
         to make sure that `_fund_recipient` is capable of collecting emissions.
     @param _receiver The address which will receive CRV emissions
-    @param _deadline The timestamp at which emissions will redirect to
-        the Curve Grant Council Multisig
     @param _max_emissions The maximum amount of emissions which `_receiver` will
         receive
     """
     assert self.factory == ZERO_ADDRESS  # dev: already initialized
 
-    assert _deadline < 2 ** 40  # dev: invalid deadline
-    assert _max_emissions < 2 ** 216  # dev: invalid maximum emissions
-
     self.factory = msg.sender
 
     self.receiver = _receiver
-    self.receiver_data = shift(_max_emissions, 40) + _deadline
+    self.max_emissions = _max_emissions
     self.cached_fallback_receiver = Factory(msg.sender).fallback_receiver()
 
     self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
