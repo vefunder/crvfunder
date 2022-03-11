@@ -85,9 +85,9 @@ def user_checkpoint(_user: address) -> bool:
     max_emissions: uint256 = shift(receiver_data, -40)
 
     # initialize emission tracking variables
-    new_emissions: uint256 = 0
     multisig_emissions: uint256 = 0
     receiver_emissions: uint256 = self.integrate_fraction[receiver]
+    cached_receiver_emissions: uint256 = receiver_emissions
 
     # checkpoint the gauge filling in any missing gauge data across weeks
     GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
@@ -121,7 +121,6 @@ def user_checkpoint(_user: address) -> bool:
         else:
             emissions = rate * w * dt / 10 ** 18
 
-        new_emissions += emissions
         # if the time period we are calculating for ends before or at the deadline
         if week_time <= deadline:
             # if the receiver emissions + emissions from this period is greater than max_emissions
@@ -146,12 +145,12 @@ def user_checkpoint(_user: address) -> bool:
         self.integrate_fraction[self.cached_fallback_receiver] += multisig_emissions
 
     # this will only be the case if receiver got emissions
-    if multisig_emissions != new_emissions:
+    if receiver_emissions != cached_receiver_emissions:
         self.integrate_fraction[receiver] = receiver_emissions
 
     self.last_checkpoint = block.timestamp
 
-    log Checkpoint(block.timestamp, new_emissions)
+    log Checkpoint(block.timestamp, (receiver_emissions - cached_receiver_emissions) + multisig_emissions)
     return True
 
 
