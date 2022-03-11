@@ -19,3 +19,21 @@ def test_deploys_with_inflation(funder, alice):
 def test_killing_ends_inflation(funder, factory, alice):
     funder.set_killed(True, {"from": alice})
     assert funder.inflation_rate() == 0
+
+
+def test_update_cached_fallback_receiver(alice, bob, charlie, funder, factory):
+    # by default both are the same value
+    assert funder.cached_fallback_receiver() == factory.fallback_receiver()
+
+    # updating while they're both the same has no effect (value unchanged)
+    funder.update_cached_fallback_receiver({"from": alice})
+    assert funder.cached_fallback_receiver() == bob
+
+    # update the value in the factory, this does not cause
+    # an automatic update, so the funder sc has a stale value
+    factory.set_fallback_receiver(charlie, {"from": alice})
+    assert funder.cached_fallback_receiver() == bob
+
+    # after calling update we should see the correct value is stored
+    funder.update_cached_fallback_receiver({"from": alice})
+    assert funder.cached_fallback_receiver() == charlie
