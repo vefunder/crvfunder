@@ -58,6 +58,4 @@ def implementation(alice, CRVFunderLocal):
 @pytest.fixture(scope="module")
 def funder(alice, factory, implementation, CRVFunderLocal):
     factory.set_implementation(implementation, {"from": alice})
-    return CRVFunderLocal.at(
-        factory.deploy(alice, 2**40 - 1, 2**128 - 1, {"from": alice}).return_value
-    )
+    return CRVFunderLocal.at(factory.deploy(alice, 2**256 - 1, {"from": alice}).return_value)
