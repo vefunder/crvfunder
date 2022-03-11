@@ -6,7 +6,7 @@
 
 
 interface Funder:
-    def initialize(_receiver: address, _deadline: uint256, _max_emissions: uint256): nonpayable
+    def initialize(_receiver: address, _max_emissions: uint256): nonpayable
 
 
 event UpdateImplementation:
@@ -23,7 +23,6 @@ event TransferOwnership:
 
 event NewFunder:
     _receiver: indexed(address)
-    _deadline: uint256
     _max_emissions: uint256
     _funder_instance: address
 
@@ -48,16 +47,16 @@ def __init__(_fallback_receiver: address):
 
 
 @external
-def deploy(_receiver: address, _deadline: uint256, _max_emissions: uint256) -> address:
+def deploy(_receiver: address, _max_emissions: uint256) -> address:
     funder: address = create_forwarder_to(self.implementation)
-    Funder(funder).initialize(_receiver, _deadline, _max_emissions)
+    Funder(funder).initialize(_receiver, _max_emissions)
 
     # update for easy enumeration
     funders_count: uint256 = self.get_funders_count
     self.funders[funders_count] = funder
     self.get_funders_count = funders_count + 1
 
-    log NewFunder(_receiver, _deadline, _max_emissions, funder)
+    log NewFunder(_receiver, _max_emissions, funder)
     return funder
 
 
