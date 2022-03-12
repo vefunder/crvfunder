@@ -1,17 +1,15 @@
 # @version 0.3.1
 """
-@title veFunder
-@notice Custom gauge directing emissions to specified wallet
+@title Fundraising Gauge
+@license MIT
+@author veFunder
+@notice Custom gauge directing emissions entirely to a specific address up to a maximum
 """
 
 
 interface CRV20:
     def rate() -> uint256: view
     def future_epoch_time_write() -> uint256: nonpayable
-
-interface Factory:
-    def owner() -> address: view
-    def fallback_receiver() -> address: view
 
 interface GaugeController:
     def checkpoint_gauge(_gauge: address): nonpayable
@@ -22,13 +20,13 @@ event Checkpoint:
     _timestamp: uint256
     _new_emissions: uint256
 
-event TransferOwnership:
-    _old_owner: indexed(address)
-    _new_owner: indexed(address)
+
+ADMIN: immutable(address)
 
 
 CRV: constant(address) = 0xD533a949740bb3306d119CC777fa900bA034cd52
 GAUGE_CONTROLLER: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB
+GRANT_COUNCIL_MULTISIG: constant(address) = 0xc420C9d507D0E038BD76383AaADCAd576ed0073c
 
 WEEK: constant(uint256) = 604800
 YEAR: constant(uint256) = 86400 * 365
@@ -49,11 +47,12 @@ receiver: public(address)
 max_emissions: public(uint256)
 
 factory: public(address)
-cached_fallback_receiver: public(address)
 
 
 @external
-def __init__():
+def __init__(_admin: address):
+    ADMIN = _admin
+
     # prevent initialization of the implementation contract
     self.factory = 0x000000000000000000000000000000000000dEaD
 
@@ -133,7 +132,7 @@ def user_checkpoint(_user: address) -> bool:
 
     # multisig has received emissions
     if multisig_emissions != 0:
-        self.integrate_fraction[self.cached_fallback_receiver] += multisig_emissions
+        self.integrate_fraction[GRANT_COUNCIL_MULTISIG] += multisig_emissions
 
     # this will only be the case if receiver got emissions
     if receiver_emissions != cached_receiver_emissions:
@@ -151,20 +150,12 @@ def set_killed(_is_killed: bool):
     @notice Set the gauge status
     @dev Inflation params are modified accordingly to disable/enable emissions
     """
-    assert msg.sender == Factory(self.factory).owner()
+    assert msg.sender == ADMIN
 
     if _is_killed:
         self.inflation_params = 0
     else:
         self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
-
-
-@external
-def update_cached_fallback_receiver():
-    """
-    @notice Update the cached fallback receiver
-    """
-    self.cached_fallback_receiver = Factory(self.factory).fallback_receiver()
 
 
 @view
@@ -202,7 +193,6 @@ def initialize(_receiver: address, _max_emissions: uint256):
 
     self.receiver = _receiver
     self.max_emissions = _max_emissions
-    self.cached_fallback_receiver = Factory(msg.sender).fallback_receiver()
 
     self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
     self.last_checkpoint = block.timestamp
