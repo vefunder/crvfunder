@@ -33,29 +33,36 @@ def minter(alice, crv20, gauge_controller, curve_dao):
 
 
 @pytest.fixture(scope="module")
-def factory(alice, bob, Factory):
-    return Factory.deploy(bob, {"from": alice})
+def admin_proxy(alice, bob, AdminProxy):
+    return AdminProxy.deploy(alice, bob, {"from": alice})
 
 
 @pytest.fixture(scope="module")
-def CRVFunderLocal(alice, CRVFunder, crv20, gauge_controller):
-    src = CRVFunder._build["source"]
+def CRVFunderLocal(charlie, FundraisingGaugeV1, crv20, gauge_controller):
+    src = FundraisingGaugeV1._build["source"]
     addrs = [
-        "0xD533a949740bb3306d119CC777fa900bA034cd52",
-        "0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB",
+        "0xD533a949740bb3306d119CC777fa900bA034cd52",  # CRV
+        "0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB",  # Gauge Controller
+        "0xc420C9d507D0E038BD76383AaADCAd576ed0073c",  # Grant Council Multisig
     ]
-    for old, new in zip(addrs, [crv20.address, gauge_controller.address]):
+    for old, new in zip(addrs, [crv20.address, gauge_controller.address, charlie.address]):
         src = src.replace(old, new, 1)
 
     return compile_source(src, vyper_version="0.3.1").Vyper
 
 
 @pytest.fixture(scope="module")
-def implementation(alice, CRVFunderLocal):
-    return CRVFunderLocal.deploy({"from": alice})
+def implementation(alice, admin_proxy, CRVFunderLocal):
+    return CRVFunderLocal.deploy(admin_proxy, {"from": alice})
 
 
 @pytest.fixture(scope="module")
-def funder(alice, factory, implementation, CRVFunderLocal):
-    factory.set_implementation(implementation, {"from": alice})
-    return CRVFunderLocal.at(factory.deploy(alice, 2**256 - 1, {"from": alice}).return_value)
+def factory(alice, GaugeFactoryV1, implementation):
+    return GaugeFactoryV1.deploy(implementation, {"from": alice})
+
+
+@pytest.fixture(scope="module")
+def funder(alice, factory, CRVFunderLocal):
+    return CRVFunderLocal.at(
+        factory.deploy_gauge(alice, 2**256 - 1, {"from": alice}).return_value
+    )
