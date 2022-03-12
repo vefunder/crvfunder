@@ -1,17 +1,17 @@
-from brownie import Factory, accounts
+from brownie import ETH_ADDRESS, GaugeFactoryV1, accounts
 
-FACTORY_ADDR = ""
 CALLER = accounts.load("dev")
+FACTORY_ADDR = ETH_ADDRESS  # TODO: change prior to running script
 
 # account to receive emissions
-RECEIVER = ""
+RECEIVER = ETH_ADDRESS  # TODO: change prior to running script
 # maximum amount of emissions to receiver (to the correct precision)
 MAX_EMISSIONS = 200 * 10**18
 
 
 def main():
     # change to be account
-    factory = Factory.at(FACTORY_ADDR)
+    factory = GaugeFactoryV1.at(FACTORY_ADDR)
 
-    tx = factory.deploy(RECEIVER, MAX_EMISSIONS, {"from": CALLER, "priority_fee": "2 gwei"})
-    print(f"Funding Gauge deployed at: {tx.events['NewFunder']['_funder_instance']}")
+    tx = factory.deploy_gauge(RECEIVER, MAX_EMISSIONS, {"from": CALLER, "priority_fee": "2 gwei"})
+    print(f"Fundraising Gauge deployed at: {tx.events['NewGauge']['_funder_instance']}")
