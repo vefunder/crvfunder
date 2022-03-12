@@ -1,91 +1,77 @@
 # @version 0.3.1
 """
-@title veFunder Factory
+@title Fundraising Gauge Factory
 @license MIT
+@author veFunder
+@notice Emissions based fundraising factory targeting Curve DAO
 """
 
 
-interface Funder:
+interface Gauge:
     def initialize(_receiver: address, _max_emissions: uint256): nonpayable
 
 
-event UpdateImplementation:
-    _old_implementation: address
-    _new_implementation: address
-
-event UpdateFallbackReceiver:
-    _old_fallback: address
-    _new_fallback: address
-
-event TransferOwnership:
-    _old_owner: address
-    _new_owner: address
-
-event NewFunder:
+event NewGauge:
+    _instance: indexed(address)
     _receiver: indexed(address)
     _max_emissions: uint256
-    _funder_instance: address
 
 
-implementation: public(address)
-fallback_receiver: public(address)
-
-owner: public(address)
-future_owner: public(address)
-
-get_funders_count: public(uint256)
-funders: public(address[1000000])
+# maximum number of gauges this factory can create
+MAX_GAUGES: constant(uint256) = 1_000_000
 
 
-@external
-def __init__(_fallback_receiver: address):
-    self.owner = msg.sender
-    self.fallback_receiver = _fallback_receiver
+OWNER: immutable(address)
+IMPLEMENTATION: immutable(address)
 
-    log TransferOwnership(ZERO_ADDRESS, msg.sender)
-    log UpdateFallbackReceiver(ZERO_ADDRESS, _fallback_receiver)
+
+# storage variables for enumerating through deployed gauges
+get_gauge_count: public(uint256)
+get_gauge_by_idx: public(address[MAX_GAUGES])
 
 
 @external
-def deploy(_receiver: address, _max_emissions: uint256) -> address:
-    funder: address = create_forwarder_to(self.implementation)
-    Funder(funder).initialize(_receiver, _max_emissions)
-
-    # update for easy enumeration
-    funders_count: uint256 = self.get_funders_count
-    self.funders[funders_count] = funder
-    self.get_funders_count = funders_count + 1
-
-    log NewFunder(_receiver, _max_emissions, funder)
-    return funder
+def __init__(_implementation: address, _owner: address):
+    IMPLEMENTATION = _implementation
+    OWNER = _owner
 
 
 @external
-def set_implementation(_implementation: address):
-    assert msg.sender == self.owner
+def deploy_gauge(_receiver: address, _max_emissions: uint256) -> address:
+    """
+    @notice Deploy a new fundraising gauge
+    @param _receiver The address which will receiver all emissions
+    @param _max_emissions The maximum amount of emissions `_receiver` will receive
+    """
+    # deploy the proxy pointing at the implementation
+    gauge: address = create_forwarder_to(IMPLEMENTATION)
 
-    log UpdateImplementation(self.implementation, _implementation)
-    self.implementation = _implementation
+    # update the enumeration storage variables
+    idx: uint256 = self.get_gauge_count
+    self.get_gauge_by_idx[idx] = gauge
+    self.get_gauge_count = idx + 1
+
+    # initialize the proxy
+    Gauge(gauge).initialize(_receiver, _max_emissions)
+
+    # log new gauge has been deployed + return gauge address
+    log NewGauge(gauge, _receiver, _max_emissions)
+    return gauge
 
 
+@pure
 @external
-def set_fallback_receiver(_fallback_receiver: address):
-    assert msg.sender == self.owner
+def implementation() -> address:
+    """
+    @notice Get the implementation address used for created proxies
+    """
+    return IMPLEMENTATION
 
-    log UpdateFallbackReceiver(self.fallback_receiver, _fallback_receiver)
-    self.fallback_receiver = _fallback_receiver
 
-
+@pure
 @external
-def commit_transfer_ownership(_future_owner: address):
-    assert msg.sender == self.owner
-
-    self.future_owner = _future_owner
-
-
-@external
-def accept_transfer_ownership():
-    assert msg.sender == self.future_owner
-
-    log TransferOwnership(self.owner, msg.sender)
-    self.owner = msg.sender
+def owner() -> address:
+    """
+    @notice Get the owner address which has the ability to kill gauges
+    """
+    return OWNER
