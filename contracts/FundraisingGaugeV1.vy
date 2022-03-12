@@ -174,6 +174,15 @@ def future_epoch_time() -> uint256:
     return bitwise_and(self.inflation_params, 2 ** 40 - 1)
 
 
+@pure
+@external
+def admin() -> address:
+    """
+    @notice Get the address of the admin which can kill this gauge
+    """
+    return ADMIN
+
+
 @external
 def initialize(_receiver: address, _max_emissions: uint256):
     """
