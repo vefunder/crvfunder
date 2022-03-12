@@ -41,9 +41,11 @@ def test_emissions_against_expected(alice, gauge_controller, funder, crv20):
 
 
 @pytest.mark.skip_coverage
-def test_reach_emissions_max(alice, gauge_controller, factory, CRVFunderLocal, crv20):
+def test_reach_emissions_max(alice, charlie, gauge_controller, factory, CRVFunderLocal, crv20):
     max_emissions = 500_000 * 10**18
-    funder = CRVFunderLocal.at(factory.deploy(alice, max_emissions, {"from": alice}).return_value)
+    funder = CRVFunderLocal.at(
+        factory.deploy_gauge(alice, max_emissions, {"from": alice}).return_value
+    )
 
     gauge_controller.add_type("Test", 10**18, {"from": alice})
     gauge_controller.add_gauge(funder, 0, 10**18, {"from": alice})
@@ -83,4 +85,4 @@ def test_reach_emissions_max(alice, gauge_controller, factory, CRVFunderLocal, c
         prev_week_time = week_time
 
     assert alice_emissions == funder.integrate_fraction(alice) == max_emissions
-    assert fallback_emissions == funder.integrate_fraction(funder.cached_fallback_receiver())
+    assert fallback_emissions == funder.integrate_fraction(charlie)
