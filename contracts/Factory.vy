@@ -21,7 +21,7 @@ event NewGauge:
 MAX_GAUGES: constant(uint256) = 1_000_000
 
 
-OWNER: immutable(address)
+# implementation contract used for deploying instances
 IMPLEMENTATION: immutable(address)
 
 
@@ -33,7 +33,6 @@ get_gauge_by_idx: public(address[MAX_GAUGES])
 @external
 def __init__(_implementation: address, _owner: address):
     IMPLEMENTATION = _implementation
-    OWNER = _owner
 
 
 @external
@@ -66,12 +65,3 @@ def implementation() -> address:
     @notice Get the implementation address used for created proxies
     """
     return IMPLEMENTATION
-
-
-@pure
-@external
-def owner() -> address:
-    """
-    @notice Get the owner address which has the ability to kill gauges
-    """
-    return OWNER
