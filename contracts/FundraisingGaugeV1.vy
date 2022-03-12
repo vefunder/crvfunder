@@ -46,15 +46,13 @@ last_checkpoint: public(uint256)
 receiver: public(address)
 max_emissions: public(uint256)
 
-factory: public(address)
-
 
 @external
 def __init__(_admin: address):
     ADMIN = _admin
 
     # prevent initialization of the implementation contract
-    self.factory = 0x000000000000000000000000000000000000dEaD
+    self.last_checkpoint = block.timestamp
 
 
 @external
@@ -187,12 +185,10 @@ def initialize(_receiver: address, _max_emissions: uint256):
     @param _max_emissions The maximum amount of emissions which `_receiver` will
         receive
     """
-    assert self.factory == ZERO_ADDRESS  # dev: already initialized
-
-    self.factory = msg.sender
+    assert self.last_checkpoint == 0  # dev: already initialized
 
     self.receiver = _receiver
     self.max_emissions = _max_emissions
 
-    self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
     self.last_checkpoint = block.timestamp
+    self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
