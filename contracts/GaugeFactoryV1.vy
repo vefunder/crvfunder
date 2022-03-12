@@ -31,7 +31,7 @@ get_gauge_by_idx: public(address[MAX_GAUGES])
 
 
 @external
-def __init__(_implementation: address, _owner: address):
+def __init__(_implementation: address):
     IMPLEMENTATION = _implementation
 
 
