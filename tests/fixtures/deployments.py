@@ -38,14 +38,17 @@ def admin_proxy(alice, bob, AdminProxy):
 
 
 @pytest.fixture(scope="module")
-def CRVFunderLocal(charlie, FundraisingGaugeV1, crv20, gauge_controller):
+def CRVFunderLocal(charlie, FundraisingGaugeV1, crv20, gauge_controller, minter):
     src = FundraisingGaugeV1._build["source"]
     addrs = [
         "0xD533a949740bb3306d119CC777fa900bA034cd52",  # CRV
         "0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB",  # Gauge Controller
         "0xc420C9d507D0E038BD76383AaADCAd576ed0073c",  # Grant Council Multisig
+        "0xd061D61a4d941c39E5453435B6345Dc261C2fcE0",  # Minter
     ]
-    for old, new in zip(addrs, [crv20.address, gauge_controller.address, charlie.address]):
+    for old, new in zip(
+        addrs, [crv20.address, gauge_controller.address, charlie.address, minter.address]
+    ):
         src = src.replace(old, new, 1)
 
     return compile_source(src, vyper_version="0.3.1").Vyper
