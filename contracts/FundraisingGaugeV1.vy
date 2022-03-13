@@ -15,6 +15,9 @@ interface GaugeController:
     def checkpoint_gauge(_gauge: address): nonpayable
     def gauge_relative_weight(_gauge: address, _time: uint256) -> uint256: view
 
+interface Minter:
+    def minted(_user: address, _gauge: address) -> uint256: view
+
 
 event Checkpoint:
     _timestamp: uint256
@@ -27,6 +30,7 @@ ADMIN: immutable(address)
 CRV: constant(address) = 0xD533a949740bb3306d119CC777fa900bA034cd52
 GAUGE_CONTROLLER: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB
 GRANT_COUNCIL_MULTISIG: constant(address) = 0xc420C9d507D0E038BD76383AaADCAd576ed0073c
+MINTER: constant(address) = 0xd061D61a4d941c39E5453435B6345Dc261C2fcE0
 
 WEEK: constant(uint256) = 604800
 YEAR: constant(uint256) = 86400 * 365
@@ -55,12 +59,8 @@ def __init__(_admin: address):
     self.last_checkpoint = block.timestamp
 
 
-@external
-def user_checkpoint(_user: address) -> bool:
-    """
-    @notice Checkpoint the gauge updating total emissions
-    @param _user The user to checkpoint and update accumulated emissions for
-    """
+@internal
+def _user_checkpoint(_user: address) -> bool:
     # timestamp of the last checkpoint and start point for calculating new emissions
     prev_week_time: uint256 = self.last_checkpoint
 
@@ -140,6 +140,27 @@ def user_checkpoint(_user: address) -> bool:
 
     log Checkpoint(block.timestamp, (receiver_emissions - cached_receiver_emissions) + multisig_emissions)
     return True
+
+
+@external
+def user_checkpoint(_user: address) -> bool:
+    """
+    @notice Checkpoint the gauge updating total emissions
+    @param _user The user to checkpoint and update accumulated emissions for
+    """
+    return self._user_checkpoint(_user)
+
+
+@external
+def claimable_tokens_write(_user: address) -> uint256:
+    """
+    @notice Get the number of claimable tokens per user
+    @dev This function should be manually changed to "view" in the ABI
+    @param _user The user to check claimable emissions of
+    @return uint256 number of claimable tokens per user
+    """
+    self._user_checkpoint(_user)
+    return self.integrate_fraction[_user] - Minter(MINTER).minted(_user, self)
 
 
 @external
