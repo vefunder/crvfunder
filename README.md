@@ -88,6 +88,13 @@ After a gauge is deployed, voted in by the DAO, and receiving emissions, the `re
 200000000000000000000
 ```
 
+3. `claimable_tokens_write(_user: address) -> uint256: nonpayable`: The amount of CRV currently claimable by `_user`. This is a write method, but should be changed in the ABI to be a view method and called via `eth_call`.
+
+```python
+>>> gauge.claimable_tokens_write.call(alice)
+1180591620717411303424
+```
+
 ### License
 
 (c) Curve.Fi, 2020 - [All rights reserved](LICENSE).
