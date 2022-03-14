@@ -54,7 +54,7 @@ def test_reach_emissions_max(alice, charlie, gauge_controller, factory, CRVFunde
     future_epoch_time = crv20.future_epoch_time_write({"from": alice}).return_value
 
     alice_emissions = 0
-    fallback_emissions = 0
+    excess_emissions = 0
 
     prev_week_time = funder.last_checkpoint()
     chain.mine(timedelta=2 * YEAR)
@@ -74,7 +74,7 @@ def test_reach_emissions_max(alice, charlie, gauge_controller, factory, CRVFunde
             emissions += gauge_weight * rate * (week_time - prev_week_time) // 10**18
 
         if alice_emissions + emissions > max_emissions:
-            fallback_emissions += emissions - (max_emissions - alice_emissions)
+            excess_emissions += emissions - (max_emissions - alice_emissions)
             alice_emissions = max_emissions
         else:
             alice_emissions += emissions
@@ -85,4 +85,4 @@ def test_reach_emissions_max(alice, charlie, gauge_controller, factory, CRVFunde
         prev_week_time = week_time
 
     assert alice_emissions == funder.integrate_fraction(alice) == max_emissions
-    assert fallback_emissions == funder.integrate_fraction(charlie)
+    assert funder.is_killed() is True

@@ -34,9 +34,8 @@ $ brownie run deploy --network mainnet
 
 ### Deployment Addresses
 
-- `ProxyAdmin`: [`0x5F75A0239a15C2f93833AEB70028AE4e6eb7879a`](https://etherscan.io/address/0x5F75A0239a15C2f93833AEB70028AE4e6eb7879a)
-- `FundraisingGaugeV1`: [`0x30849bCd1a44aFFD59371dd44A3296AD8daC91aC`](https://etherscan.io/address/0x30849bCd1a44aFFD59371dd44A3296AD8daC91aC)
-- `GaugeFactoryV1`: [`0x99851dfEbc72D1Ff83E3f97d003FCdd8D49EdEF5`](https://etherscan.io/address/0x99851dfEbc72D1Ff83E3f97d003FCdd8D49EdEF5)
+- `FundraisingGaugeV1`: [`0xCED78da2c749236309774d7415236B7090B3bF27`](https://etherscan.io/address/0xCED78da2c749236309774d7415236B7090B3bF27)
+- `GaugeFactoryV1`: [`0x696B5D296a8AeF7482B726FCf0616E32fe72A53d`](https://etherscan.io/address/0x696B5D296a8AeF7482B726FCf0616E32fe72A53d)
 
 ### [`Gauge Factory V1`](./contracts/GaugeFactoryV1.vy) Spec
 

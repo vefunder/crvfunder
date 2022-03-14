@@ -7,6 +7,7 @@ def test_admin_can_kill(alice, admin_proxy, funder):
 
     funder.set_killed(True, {"from": admin_proxy})
     assert funder.inflation_rate() == 0
+    assert funder.is_killed() is True
 
 
 def test_nonowner_cannot_kill(funder, bob):
