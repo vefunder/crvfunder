@@ -85,4 +85,4 @@ def test_reach_emissions_max(alice, charlie, gauge_controller, factory, CRVFunde
         prev_week_time = week_time
 
     assert alice_emissions == funder.integrate_fraction(alice) == max_emissions
-    assert excess_emissions > 0
+    assert funder.is_killed() is True
