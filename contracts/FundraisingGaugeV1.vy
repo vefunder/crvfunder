@@ -41,6 +41,7 @@ RATE_REDUCTION_TIME: constant(uint256) = YEAR
 
 # [uint216 inflation_rate][uint40 future_epoch_time]
 inflation_params: uint256
+_is_killed: bool
 
 # _user => accumulated CRV
 integrate_fraction: public(HashMap[address, uint256])
@@ -169,9 +170,22 @@ def set_killed(_is_killed: bool):
     assert msg.sender == ADMIN
 
     if _is_killed:
+        self._is_killed = True
         self.inflation_params = 0
     else:
+        self._is_killed = False
         self.inflation_params = shift(CRV20(CRV).rate(), 40) + CRV20(CRV).future_epoch_time_write()
+
+
+@view
+@external
+def is_killed() -> bool:
+    """
+    @notice Get whether this gauge is killed and not receiving anymore emissions
+    @dev This will return True if the max emissions has been reached or if set to killed by
+        the ADMIN.
+    """
+    return self.integrate_fraction[self.receiver] == self.max_emissions or self._is_killed
 
 
 @view
