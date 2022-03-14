@@ -33,8 +33,8 @@ def minter(alice, crv20, gauge_controller, curve_dao):
 
 
 @pytest.fixture(scope="module")
-def admin_proxy(alice, bob, AdminProxy):
-    return AdminProxy.deploy(alice, bob, {"from": alice})
+def admin_proxy(accounts):
+    return accounts[-1]
 
 
 @pytest.fixture(scope="module")
