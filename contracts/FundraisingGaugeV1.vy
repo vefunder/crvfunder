@@ -29,7 +29,6 @@ ADMIN: immutable(address)
 
 CRV: constant(address) = 0xD533a949740bb3306d119CC777fa900bA034cd52
 GAUGE_CONTROLLER: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB
-GRANT_COUNCIL_MULTISIG: constant(address) = 0xc420C9d507D0E038BD76383AaADCAd576ed0073c
 MINTER: constant(address) = 0xd061D61a4d941c39E5453435B6345Dc261C2fcE0
 
 WEEK: constant(uint256) = 604800
@@ -56,7 +55,7 @@ def __init__(_admin: address):
     ADMIN = _admin
 
     # prevent initialization of the implementation contract
-    self.last_checkpoint = block.timestamp
+    self.last_checkpoint = MAX_UINT256
 
 
 @internal
@@ -68,19 +67,24 @@ def _user_checkpoint(_user: address) -> bool:
     if block.timestamp == prev_week_time:
         return True
 
-    # load and unpack inflation params
-    inflation_params: uint256 = self.inflation_params
-    rate: uint256 = shift(inflation_params, -40)
-    future_epoch_time: uint256 = bitwise_and(inflation_params, 2 ** 40 - 1)
-
     # load the receiver
     receiver: address = self.receiver
     max_emissions: uint256 = self.max_emissions
 
     # initialize emission tracking variables
-    multisig_emissions: uint256 = 0
     receiver_emissions: uint256 = self.integrate_fraction[receiver]
+
+    # if the maximum emissions has already been reached return early
+    if receiver_emissions == max_emissions:
+        return True
+
+    # cache the receiver emissions var
     cached_receiver_emissions: uint256 = receiver_emissions
+
+    # load and unpack inflation params
+    inflation_params: uint256 = self.inflation_params
+    rate: uint256 = shift(inflation_params, -40)
+    future_epoch_time: uint256 = bitwise_and(inflation_params, 2 ** 40 - 1)
 
     # checkpoint the gauge filling in any missing gauge data across weeks
     GaugeController(GAUGE_CONTROLLER).checkpoint_gauge(self)
@@ -113,13 +117,10 @@ def _user_checkpoint(_user: address) -> bool:
         # if adding period emissions is still below max emissions add to receiver
         if receiver_emissions + period_emissions <= max_emissions:
             receiver_emissions += period_emissions
-        # if we have stored less than max emissions then give remainder to multisig and set to max
-        elif receiver_emissions < max_emissions:
-            multisig_emissions += period_emissions - (max_emissions - receiver_emissions)
-            receiver_emissions = max_emissions
-        # else give emissions to the multisig
+        # else set received emissions at max and break
         else:
-            multisig_emissions += period_emissions
+            receiver_emissions = max_emissions
+            break
 
         if week_time == block.timestamp:
             break
@@ -128,17 +129,13 @@ def _user_checkpoint(_user: address) -> bool:
         prev_week_time = week_time
         week_time = min(week_time + WEEK, block.timestamp)
 
-    # multisig has received emissions
-    if multisig_emissions != 0:
-        self.integrate_fraction[GRANT_COUNCIL_MULTISIG] += multisig_emissions
-
     # this will only be the case if receiver got emissions
     if receiver_emissions != cached_receiver_emissions:
         self.integrate_fraction[receiver] = receiver_emissions
 
     self.last_checkpoint = block.timestamp
 
-    log Checkpoint(block.timestamp, (receiver_emissions - cached_receiver_emissions) + multisig_emissions)
+    log Checkpoint(block.timestamp, (receiver_emissions - cached_receiver_emissions))
     return True
 
 
