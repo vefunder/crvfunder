@@ -29,7 +29,6 @@ ADMIN: immutable(address)
 
 CRV: constant(address) = 0xD533a949740bb3306d119CC777fa900bA034cd52
 GAUGE_CONTROLLER: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB
-GRANT_COUNCIL_MULTISIG: constant(address) = 0xc420C9d507D0E038BD76383AaADCAd576ed0073c
 MINTER: constant(address) = 0xd061D61a4d941c39E5453435B6345Dc261C2fcE0
 
 WEEK: constant(uint256) = 604800
@@ -76,9 +75,9 @@ def _user_checkpoint(_user: address) -> bool:
     # load the receiver
     receiver: address = self.receiver
     max_emissions: uint256 = self.max_emissions
+    end_funding: bool = False
 
     # initialize emission tracking variables
-    multisig_emissions: uint256 = 0
     receiver_emissions: uint256 = self.integrate_fraction[receiver]
     cached_receiver_emissions: uint256 = receiver_emissions
 
@@ -115,11 +114,11 @@ def _user_checkpoint(_user: address) -> bool:
             receiver_emissions += period_emissions
         # if we have stored less than max emissions then give remainder to multisig and set to max
         elif receiver_emissions < max_emissions:
-            multisig_emissions += period_emissions - (max_emissions - receiver_emissions)
             receiver_emissions = max_emissions
-        # else give emissions to the multisig
+            end_funding = True
+        # else end funding. note: this will reduce supply!
         else:
-            multisig_emissions += period_emissions
+            end_funding = True
 
         if week_time == block.timestamp:
             break
@@ -128,9 +127,9 @@ def _user_checkpoint(_user: address) -> bool:
         prev_week_time = week_time
         week_time = min(week_time + WEEK, block.timestamp)
 
-    # multisig has received emissions
-    if multisig_emissions != 0:
-        self.integrate_fraction[GRANT_COUNCIL_MULTISIG] += multisig_emissions
+    # Funding achieved: end it.
+    if end_funding:
+        self.inflation_params = 0
 
     # this will only be the case if receiver got emissions
     if receiver_emissions != cached_receiver_emissions:
@@ -138,7 +137,7 @@ def _user_checkpoint(_user: address) -> bool:
 
     self.last_checkpoint = block.timestamp
 
-    log Checkpoint(block.timestamp, (receiver_emissions - cached_receiver_emissions) + multisig_emissions)
+    log Checkpoint(block.timestamp, (receiver_emissions - cached_receiver_emissions))
     return True
 
 
