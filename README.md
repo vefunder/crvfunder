@@ -6,14 +6,13 @@ With the new generalised cross-chain gauge architecture, Curve inflation can be 
 
 ## Overview
 
-- [`AdminProxy`](./contracts/AdminProxy.vy): immutable ownership proxy which allows the Curve DAO / emgDAO to kill gauges
 - [`FundraisingGaugeV1`](./contracts/FundraisingGaugeV1.vy): the implementation used for fundraising gauges
 - [`GaugeFactoryV1`](./contracts/GaugeFactoryV1.vy): permissionless gauge factory for deploying fundraising gauges
 
 ### Dependencies
 
 * [python3](https://www.python.org/downloads/release/python-368/) version 3.6 or greater, python3-dev
-* [brownie](https://github.com/eth-brownie/brownie) - tested with version [1.15.0](https://github.com/eth-brownie/brownie/releases/tag/v1.17.2)
+* [brownie](https://github.com/eth-brownie/brownie) - tested with version [1.18.1](https://github.com/eth-brownie/brownie/releases/tag/v1.17.2)
 * [ganache-cli](https://github.com/trufflesuite/ganache-cli) - tested with version [6.12.1](https://github.com/trufflesuite/ganache-cli/releases/tag/v6.12.1)
 
 ### Testing
@@ -86,7 +85,7 @@ After a gauge is deployed, voted in by the DAO, and receiving emissions, the `re
 '0x66aB6D9362d4F35596279692F0251Db635165871'
 ```
 
-2. `max_emissions() -> uint256: view`: The maximum amount of emissions `receiver()` will receive, afterwards emissions will redirect to the Curve Grant Council multisig.
+2. `max_emissions() -> uint256: view`: The maximum amount of emissions `receiver()` will receive, afterwards emissions will not accrue (akin to a supply burn)
 
 ```python
 >>> gauge.max_emissions()
