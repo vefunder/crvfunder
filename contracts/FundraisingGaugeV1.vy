@@ -216,6 +216,12 @@ def admin() -> address:
 
 
 @external
+def change_receiver(new_receiver: address):
+    assert msg.sender == self.receiver
+    self.receiver = new_receiver
+
+
+@external
 def initialize(_receiver: address, _max_emissions: uint256):
     """
     @notice Proxy initializer method
